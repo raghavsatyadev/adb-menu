@@ -43,6 +43,8 @@ object AdbFacade {
   fun clearDataAndRestartWithDebugger(project: Project) =
     executeOnDevice(project, ClearDataAndRestartWithDebuggerCommand())
 
+  fun deepLink(project: Project) = executeOnDevice(project, DeepLinkCommand())
+
   fun enableWifi(project: Project) = executeOnDevice(project, ToggleSvcCommand(WIFI, true))
 
   fun disableWifi(project: Project) = executeOnDevice(project, ToggleSvcCommand(WIFI, false))

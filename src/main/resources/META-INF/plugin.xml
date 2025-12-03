@@ -100,6 +100,10 @@
                     description="Clears the private storage of the app and restarts it, and attach the debugger"
                     id="io.github.raghavsatyadev.adbidea.action.ClearDataAndRestartWithDebuggerAction"
                     text="ADB Clear App Data and Restart App With Debugger"/>
+            <action class="io.github.raghavsatyadev.adbidea.action.DeepLinkAction"
+                    description="Opens the deeplink on device"
+                    id="io.github.raghavsatyadev.adbidea.action.DeepLinkAction"
+                    text="Open Deep Link"/>
             <add-to-group anchor="first" group-id="AndroidToolsGroup"/>
             <separator/>
 

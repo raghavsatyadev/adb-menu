@@ -25,6 +25,7 @@ class QuickListAction : QuickSwitchSchemeAction(), DumbAware {
     group.addSeparator()
     addAction("io.github.raghavsatyadev.adbidea.action.StartWithDebuggerAction", group)
     addAction("io.github.raghavsatyadev.adbidea.action.RestartWithDebuggerAction", group)
+    addAction("io.github.raghavsatyadev.adbidea.action.DeepLinkAction", group)
   }
 
   private fun addAction(actionId: String, toGroup: DefaultActionGroup) {
