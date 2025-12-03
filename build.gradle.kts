@@ -9,7 +9,7 @@ plugins {
     id("org.jetbrains.kotlin.jvm") version "2.1.20"
 
     // https://github.com/JetBrains/intellij-platform-gradle-plugin
-    id("org.jetbrains.intellij.platform") version "2.6.0"
+    id("org.jetbrains.intellij.platform") version "2.10.5"
 
     // https://github.com/ajoberstar/reckon
     id("org.ajoberstar.reckon") version "0.14.0"
@@ -39,7 +39,7 @@ intellijPlatform {
         ideaVersion.untilBuild.set(provider { null })
     }
     buildSearchableOptions.set(false)
-    instrumentCode = true
+    instrumentCode = false
 }
 
 changelog {

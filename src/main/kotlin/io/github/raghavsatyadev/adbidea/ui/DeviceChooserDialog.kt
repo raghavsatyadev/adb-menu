@@ -9,76 +9,80 @@ import io.github.raghavsatyadev.adbidea.preference.ProjectPreferences
 import org.jetbrains.android.facet.AndroidFacet
 import org.jetbrains.android.util.AndroidBundle
 import org.joor.Reflect
+import java.awt.BorderLayout
 import javax.swing.JCheckBox
 import javax.swing.JComponent
 import javax.swing.JPanel
 
 /**
- * https://android.googlesource.com/platform/tools/adt/idea/+/refs/heads/mirror-goog-studio-master-dev/android/src/com/android/tools/idea/run/DeviceChooserDialog.java
+ * Programmatic UI for the device chooser dialog. Replaces the previous UI Designer-based
+ * approach to avoid initialization order issues across IDE versions.
  */
 class DeviceChooserDialog(facet: AndroidFacet) : DialogWrapper(facet.module.project, true) {
 
-  lateinit var myPanel: JPanel
-  lateinit var myDeviceChooserWrapper: JPanel
-  lateinit var useSameDeviceSCheckBox: JCheckBox
+    private val myProject: Project = facet.module.project
+    private val projectPreferences: ProjectPreferences =
+        myProject.getService(ObjectGraph::class.java).projectPreferences
 
-  private val myProject: Project
-  private val myDeviceChooser: MyDeviceChooser
-  private val projectPreferences: ProjectPreferences
+    private val rootPanel = JPanel(BorderLayout())
+    private val deviceChooserWrapper = JPanel(BorderLayout())
+    private val useSameDeviceCheckBox = JCheckBox("Use same device(s) for future commands")
 
-  val selectedDevices: Array<IDevice>
-    get() = myDeviceChooser.selectedDevices
+    private val myDeviceChooser: MyDeviceChooser
 
-  init {
-    title = AndroidBundle.message("choose.device.dialog.title")
-    myProject = facet.module.project
-    projectPreferences = myProject.getService(ObjectGraph::class.java).projectPreferences
-    okAction.isEnabled = false
-    myDeviceChooser = MyDeviceChooser(true, okAction, facet, null)
-    Disposer.register(myDisposable, myDeviceChooser)
-    myDeviceChooser.addListener(
-      object : DeviceChooserListener {
-        override fun selectedDevicesChanged() {
-          updateOkButton()
-        }
-      }
-    )
-    myDeviceChooserWrapper.add(myDeviceChooser.panel)
-    myDeviceChooser.init(projectPreferences.getSelectedDeviceSerials())
-    init()
-    updateOkButton()
-  }
+    val selectedDevices: Array<IDevice>
+        get() = myDeviceChooser.selectedDevices
 
-  private fun persistSelectedSerialsToPreferences() {
-    projectPreferences.saveSelectedDeviceSerials(
-      myDeviceChooser.selectedDevices.map { it.serialNumber }.toList()
-    )
-  }
+    init {
+        title = AndroidBundle.message("choose.device.dialog.title")
+        okAction.isEnabled = false
 
-  private fun updateOkButton() {
-    okAction.isEnabled = selectedDevices.isNotEmpty()
-  }
+        myDeviceChooser = MyDeviceChooser(true, okAction, facet, null)
+        Disposer.register(myDisposable, myDeviceChooser)
+        myDeviceChooser.addListener(object : DeviceChooserListener {
+            override fun selectedDevicesChanged() {
+                updateOkButton()
+            }
+        })
 
-  override fun getPreferredFocusedComponent(): JComponent? {
-    return try {
-      myDeviceChooser.preferredFocusComponent
-    } catch (
-        e: NoSuchMethodError
-    ) { // that means that we are probably on a preview version of android
-        // studio or in intellij 13
-      Reflect.on(myDeviceChooser).call("getDeviceTable").get<JComponent>()
+        // Build static UI
+        rootPanel.add(deviceChooserWrapper, BorderLayout.CENTER)
+        rootPanel.add(useSameDeviceCheckBox, BorderLayout.SOUTH)
+
+        // Initialize DialogWrapper and dynamic content
+        init()
+        deviceChooserWrapper.add(myDeviceChooser.panel, BorderLayout.CENTER)
+        myDeviceChooser.init(projectPreferences.getSelectedDeviceSerials())
+        updateOkButton()
     }
-  }
 
-  override fun doOKAction() {
-    myDeviceChooser.finish()
-    persistSelectedSerialsToPreferences()
-    super.doOKAction()
-  }
+    private fun persistSelectedSerialsToPreferences() {
+        projectPreferences.saveSelectedDeviceSerials(
+            myDeviceChooser.selectedDevices.map { it.serialNumber }.toList()
+        )
+    }
 
-  override fun getDimensionServiceKey() = javaClass.canonicalName
+    private fun updateOkButton() {
+        okAction.isEnabled = selectedDevices.isNotEmpty()
+    }
 
-  override fun createCenterPanel(): JComponent = myPanel
+    override fun getPreferredFocusedComponent(): JComponent? {
+        return try {
+            myDeviceChooser.preferredFocusComponent
+        } catch (e: NoSuchMethodError) { // preview versions fallback
+            Reflect.on(myDeviceChooser).call("getDeviceTable").get<JComponent>()
+        }
+    }
 
-  fun useSameDevices() = useSameDeviceSCheckBox.isSelected
+    override fun doOKAction() {
+        myDeviceChooser.finish()
+        persistSelectedSerialsToPreferences()
+        super.doOKAction()
+    }
+
+    override fun getDimensionServiceKey() = javaClass.canonicalName
+
+    override fun createCenterPanel(): JComponent = rootPanel
+
+    fun useSameDevices() = useSameDeviceCheckBox.isSelected
 }
