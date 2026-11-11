@@ -9,16 +9,16 @@ plugins {
     id("org.jetbrains.kotlin.jvm") version "2.1.20"
 
     // https://github.com/JetBrains/intellij-platform-gradle-plugin
-    id("org.jetbrains.intellij.platform") version "2.10.5"
+    id("org.jetbrains.intellij.platform") version "2.20.1"
 
     // https://github.com/ajoberstar/reckon
-    id("org.ajoberstar.reckon") version "0.14.0"
+    id("org.ajoberstar.reckon") version "2.0.0"
 
     // https://github.com/b3er/gradle-local-properties-plugin
     id("com.github.b3er.local.properties") version "1.1"
 
     // https://github.com/JetBrains/gradle-changelog-plugin
-    id("org.jetbrains.changelog") version "2.4.0"
+    id("org.jetbrains.changelog") version "2.5.0"
 }
 
 repositories {
@@ -52,8 +52,10 @@ changelog {
 }
 
 reckon {
-    scopeFromProp()
-    snapshotFromProp()
+    setDefaultInferredScope("minor") // 0.14 default
+    snapshots()
+    setScopeCalc(calcScopeFromProp())
+    setStageCalc(calcStageFromProp())
 }
 
 kotlin { jvmToolchain(21) }
