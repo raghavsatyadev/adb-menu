@@ -101,27 +101,6 @@ class DeepLinkDialog(project: Project) : DialogWrapper(project, true) {
     okAction.isEnabled = isUrlValid
   }
 
-  private fun isValidUrl(urlString: String): Boolean {
-    if (urlString.isBlank()) return false
-
-    // Deeplink URL validation:
-    // - Must contain a scheme (http://, https://, myapp://, intent://, etc.)
-    // - Scheme must be followed by :// or similar
-    // - Must have at least some content after the scheme
-    val schemePattern = Regex("^[a-zA-Z][a-zA-Z0-9+\\-.]*://.*")
-
-    if (!schemePattern.matches(urlString)) {
-      return false
-    }
-
-    return try {
-      URI(urlString)
-      true
-    } catch (@Suppress("UNUSED_PARAMETER") e: Exception) {
-      false
-    }
-  }
-
   // Return non-null component to satisfy DialogWrapper signature
   override fun getPreferredFocusedComponent(): JComponent = urlField
 
@@ -143,11 +122,27 @@ class DeepLinkDialog(project: Project) : DialogWrapper(project, true) {
       clearTask = clearTask.isSelected,
     )
 
-  private companion object {
-    const val PREFIX = "io.github.raghavsatyadev.adbidea.deeplink."
-    const val KEY_URL = PREFIX + "url"
-    const val KEY_RESTRICT = PREFIX + "restrictToApp"
-    const val KEY_NEW_TASK = PREFIX + "newTask"
-    const val KEY_CLEAR_TASK = PREFIX + "clearTask"
+  internal companion object {
+    private val SCHEME = Regex("^[a-zA-Z][a-zA-Z0-9+\\-.]*:.+")
+
+    /**
+     * Any URI with a scheme and something after it: hierarchical ones (`https://…`, `myapp://…`)
+     * and opaque ones (`tel:123`, `mailto:a@b.c`, `intent:…`).
+     */
+    internal fun isValidUrl(urlString: String): Boolean {
+      if (!SCHEME.matches(urlString)) return false
+      return try {
+        URI(urlString)
+        true
+      } catch (_: Exception) {
+        false
+      }
+    }
+
+    private const val PREFIX = "io.github.raghavsatyadev.adbidea.deeplink."
+    private const val KEY_URL = PREFIX + "url"
+    private const val KEY_RESTRICT = PREFIX + "restrictToApp"
+    private const val KEY_NEW_TASK = PREFIX + "newTask"
+    private const val KEY_CLEAR_TASK = PREFIX + "clearTask"
   }
 }
