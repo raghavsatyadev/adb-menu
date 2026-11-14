@@ -25,56 +25,67 @@ class DeviceResultFetcher(
 ) {
 
   fun fetch(): DeviceResult? {
-    val facets = ProjectFacetManager.getInstance(project).getFacets(AndroidFacet.ID)
-    if (facets.isNotEmpty()) {
-      val facet = getFacet(facets) ?: return null
+    val target = resolveTarget() ?: return DeviceResult.Cancelled
+    val (facet, packageName) = target
 
-        val packageName =
-            AndroidModel.get(facet)?.applicationId
-                ?: run {
-                    NotificationHelper.error("No Android package found")
-
-                    return null
-                }
-
-      if (!bridge.isReady()) {
-        NotificationHelper.error("No platform configured")
-        return null
-      }
-
-      val rememberedDevices = useSameDevicesHelper.getRememberedDevices()
-      if (rememberedDevices.isNotEmpty()) {
-        return SuccessfulDeviceResult(rememberedDevices, facet, packageName)
-      }
-
-      val devices = bridge.connectedDevices()
-      return if (devices.size == 1) {
-        SuccessfulDeviceResult(devices, facet, packageName)
-      } else if (devices.size > 1) {
-        showDeviceChooserDialog(facet, packageName)
-      } else {
-        DeviceNotFound
-      }
+    if (!bridge.isReady()) {
+      NotificationHelper.error("No platform configured")
+      return DeviceResult.Cancelled
     }
+
+    val rememberedDevices = useSameDevicesHelper.getRememberedDevices()
+    if (rememberedDevices.isNotEmpty()) {
+      return SuccessfulDeviceResult(rememberedDevices, facet, packageName)
+    }
+
+    val devices = bridge.connectedDevices()
+    return when {
+      devices.size == 1 -> SuccessfulDeviceResult(devices, facet, packageName)
+      devices.size > 1 -> showDeviceChooserDialog(facet, packageName)
+      else -> DeviceNotFound
+    }
+  }
+
+  /**
+   * Picks the app to act on: an Android app module when the project has one, otherwise the
+   * `android/app` folder of a Flutter or React Native project. Returns null (after telling the user
+   * why, unless they cancelled) when there is nothing to act on.
+   */
+  private fun resolveTarget(): Pair<AndroidFacet?, String>? {
+    val facets = ProjectFacetManager.getInstance(project).getFacets(AndroidFacet.ID)
+    val appFacets = appFacets(facets)
+    if (appFacets.isNotEmpty()) {
+      val facet = chooseFacet(appFacets) ?: return null
+      val packageName =
+        AndroidModel.get(facet)?.applicationId
+          ?: run {
+            NotificationHelper.error("No Android package found")
+            return null
+          }
+      return facet to packageName
+    }
+
+    CrossPlatformAppResolver.resolvePackageName(project)?.let {
+      return null to it
+    }
+
+    NotificationHelper.error(
+      "No Android app found. Open an Android app project, or a Flutter / React Native project " +
+        "with an <b>android/app</b> folder."
+    )
     return null
   }
 
-  private fun getFacet(facets: List<AndroidFacet>): AndroidFacet? {
-    val appFacets =
-      facets
-        .map { HolderModuleGetter(it).get() }
-        .mapNotNull { it.androidFacet }
-        .filter { it.configuration.isAppProject }
-        .distinct()
+  private fun appFacets(facets: List<AndroidFacet>): List<AndroidFacet> =
+    facets
+      .map { HolderModuleGetter(it).get() }
+      .mapNotNull { it.androidFacet }
+      .filter { it.configuration.isAppProject }
+      .distinct()
 
-    return if (appFacets.size > 1) {
-      ModuleChooserDialogHelper.showDialogForFacets(project, appFacets)
-    } else if (appFacets.size == 1) {
-        appFacets.first()
-    } else {
-        null
-    }
-  }
+  private fun chooseFacet(appFacets: List<AndroidFacet>): AndroidFacet? =
+    if (appFacets.size > 1) ModuleChooserDialogHelper.showDialogForFacets(project, appFacets)
+    else appFacets.first()
 
   // Can be removed after 242.23339
   class HolderModuleGetter(private val facet: AndroidFacet) : BackwardCompatibleGetter<Module>() {
@@ -89,8 +100,8 @@ class DeviceResultFetcher(
     }
   }
 
-  private fun showDeviceChooserDialog(facet: AndroidFacet, packageName: String): DeviceResult {
-    val chooser = DeviceChooserDialog(facet)
+  private fun showDeviceChooserDialog(facet: AndroidFacet?, packageName: String): DeviceResult {
+    val chooser = DeviceChooserDialog(project, facet)
     chooser.show()
 
     if (chooser.exitCode != DialogWrapper.OK_EXIT_CODE) {
@@ -114,7 +125,7 @@ class DeviceResultFetcher(
 sealed class DeviceResult {
   data class SuccessfulDeviceResult(
     val devices: List<IDevice>,
-    val facet: AndroidFacet,
+    val facet: AndroidFacet?,
     val packageName: String,
   ) : DeviceResult()
 

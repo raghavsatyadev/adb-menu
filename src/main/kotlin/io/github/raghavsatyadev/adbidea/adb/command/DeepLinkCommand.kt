@@ -1,77 +1,62 @@
 package io.github.raghavsatyadev.adbidea.adb.command
 
-import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.progress.ProcessCanceledException
 import io.github.raghavsatyadev.adbidea.adb.AdbUtil
 import io.github.raghavsatyadev.adbidea.adb.command.receiver.GenericReceiver
-import io.github.raghavsatyadev.adbidea.ui.DeepLinkDialog
 import io.github.raghavsatyadev.adbidea.ui.NotificationHelper
 import java.util.concurrent.TimeUnit
 
-class DeepLinkCommand : Command {
+/** How a deep link should be fired. Picked once in the dialog, then sent to every device. */
+data class DeepLinkOptions(
+  val url: String,
+  /** Resolve the link only inside the current app (`am start ... <package>`). */
+  val restrictToApp: Boolean = true,
+  /** Launch in a new task (`--activity-new-task`). */
+  val newTask: Boolean = false,
+  /** Clear the existing task first (`--activity-clear-task`, implies a new task). */
+  val clearTask: Boolean = false,
+)
+
+class DeepLinkCommand(private val options: DeepLinkOptions) : Command {
   override fun run(context: CommandContext): Boolean =
     with(context) {
       try {
-        // Show dialog to get URL from user on the EDT and capture result
-        var url: String? = null
-        var dialogConfirmed = false
-
-        ApplicationManager.getApplication()
-          .invokeAndWait(
-            {
-              val dialog = DeepLinkDialog(project)
-              dialogConfirmed = dialog.showAndGet()
-              if (dialogConfirmed) {
-                url = dialog.getUrl()
-              }
-            },
-            ModalityState.defaultModalityState(),
+        if (options.restrictToApp && !AdbUtil.isAppInstalled(device, packageName)) {
+          NotificationHelper.error(
+            String.format("<b>%s</b> is not installed on %s", packageName, device.name)
           )
-
-        if (!dialogConfirmed) return false
-
-        return fireDeepLink(url)
+          return false
+        }
+        val receiver = GenericReceiver()
+        device.executeShellCommand(buildShellCommand(options, packageName), receiver, 15L, TimeUnit.SECONDS)
+        val failure = receiver.adbOutputLines.firstOrNull { it.startsWith("Error") }
+        if (failure != null) {
+          NotificationHelper.error(
+            String.format("Deep link failed on %s.<br/><b>ADB Output:</b> %s", device.name, failure)
+          )
+          return false
+        }
+        NotificationHelper.info(String.format("Deep link sent on %s: %s", device.name, options.url))
+        return true
       } catch (e: ProcessCanceledException) {
         throw e
-      } catch (e1: Exception) {
-        NotificationHelper.error("Deep link failed... " + e1.message)
+      } catch (e: Exception) {
+        NotificationHelper.error("Deep link failed... " + e.message)
       }
       return false
     }
 
-  private fun CommandContext.fireDeepLink(url: String?): Boolean {
-    if (!validateURL(url)) return false
-
-    if (AdbUtil.isAppInstalled(device, packageName)) {
-      val shell = "am start -W -a android.intent.action.VIEW -d \"$url\""
-      device.executeShellCommand(shell, GenericReceiver(), 15L, TimeUnit.SECONDS)
-      NotificationHelper.info(
-        String.format("<b>%s</b> deep link sent on %s", packageName, device.name)
-      )
-      return true
-    } else {
-      NotificationHelper.error(
-        String.format("<b>%s</b> is not installed on %s", packageName, device.name)
-      )
-    }
-    return false
-  }
-
-  private fun validateURL(url: String?): Boolean {
-
-    if (url.isNullOrBlank()) {
-      NotificationHelper.error("Deep link url is empty")
-      return false
+  companion object {
+    fun buildShellCommand(options: DeepLinkOptions, packageName: String): String {
+      val sb = StringBuilder("am start -W -a android.intent.action.VIEW")
+      sb.append(" -d ").append(shellQuote(options.url))
+      if (options.newTask || options.clearTask) sb.append(" --activity-new-task")
+      if (options.clearTask) sb.append(" --activity-clear-task")
+      if (options.restrictToApp) sb.append(' ').append(packageName)
+      return sb.toString()
     }
 
-    // Optional: basic scheme validation
-    if (!url.contains("://") && !url.contains(":/")) {
-      NotificationHelper.error(
-        "Invalid deep link url: missing scheme (e.g. myapp://... or https://...)"
-      )
-      return false
-    }
-    return true
+    /** Single-quote for the device shell so `&`, `?`, `$` in the URL reach `am` untouched. */
+    fun shellQuote(value: String): String = "'" + value.replace("'", "'\\''") + "'"
   }
 }

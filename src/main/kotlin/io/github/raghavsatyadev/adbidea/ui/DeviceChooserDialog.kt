@@ -18,9 +18,9 @@ import javax.swing.JPanel
  * Programmatic UI for the device chooser dialog. Replaces the previous UI Designer-based
  * approach to avoid initialization order issues across IDE versions.
  */
-class DeviceChooserDialog(facet: AndroidFacet) : DialogWrapper(facet.module.project, true) {
+class DeviceChooserDialog(private val myProject: Project, facet: AndroidFacet?) :
+    DialogWrapper(myProject, true) {
 
-    private val myProject: Project = facet.module.project
     private val projectPreferences: ProjectPreferences =
         myProject.getService(ObjectGraph::class.java).projectPreferences
 
@@ -37,7 +37,7 @@ class DeviceChooserDialog(facet: AndroidFacet) : DialogWrapper(facet.module.proj
         title = AndroidBundle.message("choose.device.dialog.title")
         okAction.isEnabled = false
 
-        myDeviceChooser = MyDeviceChooser(true, okAction, facet, null)
+        myDeviceChooser = MyDeviceChooser(true, okAction, myProject, facet, null)
         Disposer.register(myDisposable, myDeviceChooser)
         myDeviceChooser.addListener(object : DeviceChooserListener {
             override fun selectedDevicesChanged() {

@@ -32,6 +32,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.util.Condition
 import com.intellij.openapi.util.text.StringUtil
+import com.intellij.openapi.project.Project
 import com.intellij.ui.ColoredTableCellRenderer
 import com.intellij.ui.DoubleClickListener
 import com.intellij.ui.ScrollPaneFactory
@@ -67,19 +68,20 @@ import javax.swing.table.AbstractTableModel
 class MyDeviceChooser(
   multipleSelection: Boolean,
   okAction: Action,
-  private val myFacet: AndroidFacet,
+  private val myProject: Project,
+  /** Null for projects without an Android facet (Flutter, React Native): compatibility is unknown. */
+  private val myFacet: AndroidFacet?,
   private val myFilter: Condition<IDevice>?,
 ) : Disposable {
   private val myListeners = ContainerUtil.createLockFreeCopyOnWriteList<DeviceChooserListener>()
   private val myRefreshingAlarm: Alarm
   private val myBridge: AndroidDebugBridge?
-  private val myMinSdkVersion: ListenableFuture<AndroidVersion> =
-    StudioAndroidModuleInfo.getInstance(myFacet).runtimeMinSdkVersion
+  private val myMinSdkVersion: ListenableFuture<AndroidVersion>? =
+    myFacet?.let { StudioAndroidModuleInfo.getInstance(it).runtimeMinSdkVersion }
 
-  private val myProjectTarget: IAndroidTarget =
-    getInstance(myFacet.module)?.target ?: error("Module [${myFacet.module.name}] already disposed")
+  private val myProjectTarget: IAndroidTarget? = myFacet?.let { getInstance(it.module)?.target }
 
-  private val androidModuleModel = AndroidModel.get(myFacet)
+  private val androidModuleModel = myFacet?.let { AndroidModel.get(it) }
   private val mySupportedAbis = androidModuleModel?.supportedAbis ?: Collections.emptySet()
 
   @Volatile private var myProcessSelectionFlag = true
@@ -233,7 +235,7 @@ class MyDeviceChooser(
         if (row >= 0) {
           val serial = myDeviceTable.getValueAt(row, SERIAL_COLUMN_INDEX)
           val bridge =
-            AndroidSdkUtils.getDebugBridge(myFacet.module.project) ?: return EMPTY_DEVICE_ARRAY
+            AndroidSdkUtils.getDebugBridge(myProject) ?: return EMPTY_DEVICE_ARRAY
           val devices = getFilteredDevices(bridge)
           for (device in devices) {
             if (device.serialNumber == serial.toString()) {
@@ -302,12 +304,14 @@ class MyDeviceChooser(
         SERIAL_COLUMN_INDEX -> return device.serialNumber
         DEVICE_STATE_COLUMN_INDEX -> return getDeviceState(device)
         COMPATIBILITY_COLUMN_INDEX -> {
+          val minSdk = myMinSdkVersion ?: return null
+          val target = myProjectTarget ?: return null
           val connectedDevice: AndroidDevice = androidDevice(device).get()
           return try {
-            if (myMinSdkVersion.isDone)
+            if (minSdk.isDone)
               connectedDevice.canRun(
-                myMinSdkVersion.get(),
-                myProjectTarget,
+                minSdk.get(),
+                target,
                 { EnumSet.noneOf(HardwareFeature::class.java) },
                 mySupportedAbis,
               )
@@ -477,6 +481,6 @@ class MyDeviceChooser(
     // Allow sorting by columns (in lexicographic order)
     myDeviceTable.autoCreateRowSorter = true
     myRefreshingAlarm = Alarm(Alarm.ThreadToUse.POOLED_THREAD, this)
-    myBridge = AndroidSdkUtils.getDebugBridge(myFacet.module.project)
+    myBridge = AndroidSdkUtils.getDebugBridge(myProject)
   }
 }

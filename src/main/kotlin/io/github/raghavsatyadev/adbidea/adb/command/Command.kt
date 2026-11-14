@@ -13,7 +13,8 @@ interface Command {
 data class CommandContext(
     val project: Project,
     val device: IDevice,
-    val facet: AndroidFacet,
+    /** Null when the app comes from a project without an Android facet (Flutter, React Native). */
+    val facet: AndroidFacet?,
     val packageName: String,
     val coroutineScope: CoroutineScope,
 )
