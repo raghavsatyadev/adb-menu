@@ -2,6 +2,10 @@
 
 ## [[Unreleased]]
 
+## [1.7.5] - 2026-11-15
+
+- Open Deep Link accepts links without `//`, such as `tel:123`, `mailto:user@example.com` and `geo:0,0`
+
 ## [1.7.4] - 2026-11-15
 
 - Support Android Studio Rabbit 2 | 2026.2.2 and Rabbit 3 | 2026.2.3 Canary 3 (drops 2025.x)
