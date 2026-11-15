@@ -6,7 +6,7 @@ plugins {
     // Must match the Kotlin version bundled with the IDE
     // https://plugins.jetbrains.com/docs/intellij/using-kotlin.html#kotlin-standard-library
     // https://plugins.jetbrains.com/docs/intellij/android-studio-releases-list.html
-    id("org.jetbrains.kotlin.jvm") version "2.1.20"
+    id("org.jetbrains.kotlin.jvm") version "2.5.0-RC"
 
     // https://github.com/JetBrains/intellij-platform-gradle-plugin
     id("org.jetbrains.intellij.platform") version "2.20.1"
@@ -40,6 +40,14 @@ intellijPlatform {
     }
     buildSearchableOptions.set(false)
     instrumentCode = false
+
+    // Used by `publishPlugin` (see .github/workflows/release.yml). Signing is skipped when unset.
+    publishing { token = providers.environmentVariable("PUBLISH_TOKEN") }
+    signing {
+        certificateChain = providers.environmentVariable("CERTIFICATE_CHAIN")
+        privateKey = providers.environmentVariable("PRIVATE_KEY")
+        password = providers.environmentVariable("PRIVATE_KEY_PASSWORD")
+    }
 }
 
 changelog {
@@ -52,7 +60,7 @@ changelog {
 }
 
 reckon {
-    setDefaultInferredScope("minor") // 0.14 default
+    setDefaultInferredScope("patch")
     snapshots()
     setScopeCalc(calcScopeFromProp())
     setStageCalc(calcStageFromProp())
@@ -126,11 +134,11 @@ dependencies {
         }
     }
 
-    implementation("org.jooq:joor:0.9.15")
+    implementation("org.jooq:joor:0.9.17")
 
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.mockito:mockito-core:4.7.0")
-    testImplementation("com.google.truth:truth:1.4.4")
+    testImplementation("org.mockito:mockito-core:5.24.0")
+    testImplementation("com.google.truth:truth:1.4.5")
 }
 
 fun recentChanges(outputType: Changelog.OutputType): String {

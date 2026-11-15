@@ -7,6 +7,7 @@ import io.github.raghavsatyadev.adbidea.adb.DeviceResult.SuccessfulDeviceResult
 import io.github.raghavsatyadev.adbidea.adb.command.*
 import io.github.raghavsatyadev.adbidea.adb.command.SvcCommand.MOBILE
 import io.github.raghavsatyadev.adbidea.adb.command.SvcCommand.WIFI
+import io.github.raghavsatyadev.adbidea.ui.DeepLinkDialog
 import io.github.raghavsatyadev.adbidea.ui.NotificationHelper
 import java.util.concurrent.Executors
 
@@ -42,6 +43,13 @@ object AdbFacade {
 
   fun clearDataAndRestartWithDebugger(project: Project) =
     executeOnDevice(project, ClearDataAndRestartWithDebuggerCommand())
+
+  /** Asks for the link once (not once per device), then fires it on every chosen device. */
+  fun deepLink(project: Project) {
+    val dialog = DeepLinkDialog(project)
+    if (!dialog.showAndGet()) return
+    executeOnDevice(project, DeepLinkCommand(dialog.getOptions()))
+  }
 
   fun enableWifi(project: Project) = executeOnDevice(project, ToggleSvcCommand(WIFI, true))
 

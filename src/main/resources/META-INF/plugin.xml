@@ -8,6 +8,11 @@
 
         <!-- Notification group for errors -->
         <notificationGroup displayType="BALLOON" id="ADB Menu (Errors)" isLogByDefault="true"/>
+
+        <!-- One-click buttons for every ADB Menu command -->
+        <toolWindow id="ADB Menu" anchor="right" secondary="true"
+                    icon="/icons/adbMenuToolWindow.svg"
+                    factoryClass="io.github.raghavsatyadev.adbidea.ui.AdbToolWindowFactory"/>
     </extensions>
     <description><![CDATA[
         Original Plugin: <a href="https://github.com/pbreault/adb-idea">https://github.com/pbreault/adb-idea</a><br />
@@ -24,10 +29,15 @@
             <li>ADB Grant/Revoke Permissions</li>
             <li>ADB Enable/Disable Wi-Fi</li>
             <li>ADB Enable/Disable Mobile Data</li>
+            <li>Open Deep Link (with new-task / clear-task options)</li>
         </ul>
+        Works with Android projects and with Flutter / React Native projects opened at their root
+        (the app id is read from <code>android/app</code>).
         <br />
-        There are two basic ways to invoke a command:
+        <br />
+        There are three ways to invoke a command:
         <ul>
+            <li>Through the "ADB Menu" tool window</li>
             <li>Through the Tools->Android->ADB Menu</li>
             <li>By searching for "ADB" in "Find Actions" (osx: Cmd+Shift+A, windows/linux: Ctrl+Alt+Shift+A)</li>
         </ul>
@@ -100,6 +110,10 @@
                     description="Clears the private storage of the app and restarts it, and attach the debugger"
                     id="io.github.raghavsatyadev.adbidea.action.ClearDataAndRestartWithDebuggerAction"
                     text="ADB Clear App Data and Restart App With Debugger"/>
+            <action class="io.github.raghavsatyadev.adbidea.action.DeepLinkAction"
+                    description="Opens the deeplink on device"
+                    id="io.github.raghavsatyadev.adbidea.action.DeepLinkAction"
+                    text="Open Deep Link"/>
             <add-to-group anchor="first" group-id="AndroidToolsGroup"/>
             <separator/>
 

@@ -1,0 +1,94 @@
+name: Release Plugin
+# Run by hand from the Actions tab. Takes the newest version from CHANGELOG.md, tags the selected
+# commit with it (reckon reads the version from that tag), builds the plugin ZIP, creates the
+# GitHub release and, when the PUBLISH_TOKEN secret is set, publishes to the JetBrains Marketplace.
+on:
+  workflow_dispatch:
+    inputs:
+      publishToMarketplace:
+        description: Publish to the JetBrains Marketplace (needs the PUBLISH_TOKEN secret)
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
+      CERTIFICATE_CHAIN: ${{ secrets.CERTIFICATE_CHAIN }}
+      PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+      PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout Sources
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Read version and notes from CHANGELOG.md
+        id: changelog
+        run: |
+          VERSION=$(grep -m1 -oP '^## \[\K[0-9]+\.[0-9]+\.[0-9]+(?=\])' CHANGELOG.md)
+          if [ -z "$VERSION" ]; then echo "No released version found in CHANGELOG.md" >&2; exit 1; fi
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" {found=1; next}
+            found && /^## / {exit}
+            found {print}
+          ' CHANGELOG.md > release-notes.md
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Releasing **$VERSION**" >> "$GITHUB_STEP_SUMMARY"
+          cat release-notes.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Tag the commit
+        env:
+          VERSION: ${{ steps.changelog.outputs.version }}
+        run: |
+          if git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null; then
+            if [ "$(git rev-list -n1 "$VERSION")" != "$(git rev-parse HEAD)" ]; then
+              echo "Tag $VERSION already exists on another commit. Add a new version to CHANGELOG.md." >&2
+              exit 1
+            fi
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag "$VERSION"
+            git push origin "refs/tags/$VERSION"
+          fi
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Build plugin
+        env:
+          VERSION: ${{ steps.changelog.outputs.version }}
+        run: |
+          ./gradlew buildPlugin --no-configuration-cache
+          test -f "build/distributions/adb-menu-$VERSION.zip"
+
+      - name: Create GitHub release
+        env:
+          VERSION: ${{ steps.changelog.outputs.version }}
+        run: |
+          ZIP="build/distributions/adb-menu-$VERSION.zip"
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            gh release upload "$VERSION" "$ZIP" --clobber
+          else
+            gh release create "$VERSION" "$ZIP" --title "$VERSION" --notes-file release-notes.md
+          fi
+
+      - name: Publish to JetBrains Marketplace
+        if: ${{ inputs.publishToMarketplace && env.PUBLISH_TOKEN != '' }}
+        run: ./gradlew publishPlugin --no-configuration-cache
+
+      - name: Marketplace skipped
+        if: ${{ inputs.publishToMarketplace && env.PUBLISH_TOKEN == '' }}
+        run: echo "::warning::PUBLISH_TOKEN secret is not set, so the plugin was not published to the Marketplace."

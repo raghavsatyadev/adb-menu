@@ -21,18 +21,18 @@ jobs:
           cat studio-releases.json | jq '.content.item | map(select(.channel == "Canary")) | .[0] | del(.download)' >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
       - name: Checkout Sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Setup JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 21
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v6
       - name: Build with latest canary version
         env:
           STUDIO_VERSION: ${{ steps.fetch-studio-version.outputs.STUDIO_VERSION }}
         run: |
           echo "Building with Android Studio Canary version: $STUDIO_VERSION"
-          ./gradlew build -PideVersion=$STUDIO_VERSION --no-configuration-cache
+          ./gradlew build -PcanaryIdeVersion=$STUDIO_VERSION --no-configuration-cache
 
