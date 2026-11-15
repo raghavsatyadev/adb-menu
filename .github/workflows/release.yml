@@ -37,10 +37,10 @@ jobs:
             $0 ~ "^## \\[" v "\\]" {found=1; next}
             found && /^## / {exit}
             found {print}
-          ' CHANGELOG.md > release-notes.md
+          ' CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Releasing **$VERSION**" >> "$GITHUB_STEP_SUMMARY"
-          cat release-notes.md >> "$GITHUB_STEP_SUMMARY"
+          cat "$RUNNER_TEMP/release-notes.md" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Tag the commit
         env:
@@ -82,7 +82,7 @@ jobs:
           if gh release view "$VERSION" >/dev/null 2>&1; then
             gh release upload "$VERSION" "$ZIP" --clobber
           else
-            gh release create "$VERSION" "$ZIP" --title "$VERSION" --notes-file release-notes.md
+            gh release create "$VERSION" "$ZIP" --title "$VERSION" --notes-file "$RUNNER_TEMP/release-notes.md"
           fi
 
       - name: Publish to JetBrains Marketplace
